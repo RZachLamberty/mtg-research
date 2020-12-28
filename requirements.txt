@@ -1,0 +1,10 @@
+-e git+https://github.com/RZachLamberty/mtg_data.git#egg=mtg
+jupyter
+lxml
+matplotlib
+pandas
+pyarrow
+torch
+torchaudio
+torchvision
+transformers
