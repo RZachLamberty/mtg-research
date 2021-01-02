@@ -23,6 +23,11 @@ from transformers import BertTokenizerFast
 from utils import build_tokenizer_map_func
 
 
+# turn off progress bars
+from datasets.utils.logging import set_verbosity_error
+set_verbosity_error()
+
+
 def add_labels(examples):
     return {'labels': examples['input_ids']}
 

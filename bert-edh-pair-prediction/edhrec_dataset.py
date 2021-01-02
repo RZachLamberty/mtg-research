@@ -1,4 +1,3 @@
-import math
 import os
 from dataclasses import dataclass
 
@@ -6,6 +5,10 @@ import datasets
 import numpy as np
 import pandas as pd
 from tqdm.auto import tqdm
+
+# turn off progress bars
+from datasets.utils.logging import set_verbosity_error
+set_verbosity_error()
 
 # TODO: Add BibTeX citation
 # Find for instance the citation on arxiv or on the dataset repo/website
@@ -72,8 +75,8 @@ class EdhrecDataset(datasets.GeneratorBasedBuilder):
 
     def _generate_examples(self, split):
         """actually yield examples from split"""
-        print(f"num_chunks = {self.config.num_chunks}")
-        print(f"chunk = {self.config.chunk}")
+        #print(f"num_chunks = {self.config.num_chunks}")
+        #print(f"chunk = {self.config.chunk}")
         assert (self.config.num_chunks is None) == (
                     self.config.chunk is None), "provide both num_chunks and chunk or neither"
 
@@ -85,9 +88,9 @@ class EdhrecDataset(datasets.GeneratorBasedBuilder):
         if self.config.num_chunks is None:
             a_recs = these_cards
         else:
-            chunk_size = math.ceil(these_cards.shape[0] / self.config.num_chunks)
-            i0 = self.config.chunk * chunk_size
-            i1 = i0 + chunk_size
+            chunk_size = these_cards.shape[0] / self.config.num_chunks
+            i0 = int(self.config.chunk * chunk_size)
+            i1 = int((self.config.chunk + 1) * chunk_size)
             a_recs = these_cards.iloc[i0: i1]
 
         for name_a, card_row in tqdm(a_recs.iterrows(), total=a_recs.shape[0]):
