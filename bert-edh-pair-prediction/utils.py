@@ -14,6 +14,7 @@ Usage:
     >>> import utils
 
 """
+import itertools
 
 
 def build_tokenizer_map_func(tokenizer, max_length=512):
@@ -23,3 +24,10 @@ def build_tokenizer_map_func(tokenizer, max_length=512):
                          max_length=max_length,
                          truncation=True, )
     return tokenizer_map_func
+
+
+def grouper(iterable, n, fillvalue=None):
+    """Collect data into fixed-length chunks or blocks"""
+    # grouper('ABCDEFG', 3, 'x') --> ABC DEF Gxx"
+    args = [iter(iterable)] * n
+    return itertools.zip_longest(*args, fillvalue=fillvalue)

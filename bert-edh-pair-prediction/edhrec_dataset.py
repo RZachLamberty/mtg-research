@@ -1,10 +1,11 @@
+import math
 import os
 from dataclasses import dataclass
 
 import datasets
 import numpy as np
 import pandas as pd
-from tqdm.notebook import tqdm
+from tqdm.auto import tqdm
 
 # TODO: Add BibTeX citation
 # Find for instance the citation on arxiv or on the dataset repo/website
@@ -31,9 +32,12 @@ _LICENSE = ""
 
 SPLITS = ['train', 'test', 'validation']
 
+
 @dataclass
 class EdhrecConfig(datasets.BuilderConfig):
     num_max_pairs: int = None
+    num_chunks: int = None
+    chunk: int = None
 
 
 class EdhrecDataset(datasets.GeneratorBasedBuilder):
@@ -68,12 +72,25 @@ class EdhrecDataset(datasets.GeneratorBasedBuilder):
 
     def _generate_examples(self, split):
         """actually yield examples from split"""
+        print(f"num_chunks = {self.config.num_chunks}")
+        print(f"chunk = {self.config.chunk}")
+        assert (self.config.num_chunks is None) == (
+                    self.config.chunk is None), "provide both num_chunks and chunk or neither"
+
         these_cards = pd.read_parquet(os.path.join(self.config.data_dir, f"cards.{split}.parquet"))
         these_edhrec = pd.read_parquet(os.path.join(self.config.data_dir,
                                                     f"edhrec.{split}.parquet"))
         non_edhrec_card_names = set(these_cards.index).difference(these_edhrec.name.unique())
 
-        for name_a, card_row in tqdm(these_cards.iterrows(), total=these_cards.shape[0]):
+        if self.config.num_chunks is None:
+            a_recs = these_cards
+        else:
+            chunk_size = math.ceil(these_cards.shape[0] / self.config.num_chunks)
+            i0 = self.config.chunk * chunk_size
+            i1 = i0 + chunk_size
+            a_recs = these_cards.iloc[i0: i1]
+
+        for name_a, card_row in tqdm(a_recs.iterrows(), total=a_recs.shape[0]):
             text_a = card_row.mytext
             sfid_a = card_row.scryfallId
             commanders = these_edhrec[these_edhrec.name == name_a].commander.unique()
