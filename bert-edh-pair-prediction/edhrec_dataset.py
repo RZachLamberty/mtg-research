@@ -122,9 +122,9 @@ class EdhrecDataset(datasets.GeneratorBasedBuilder):
                     size=min(self.config.num_max_pairs, len(non_edhrec_non_peers)),
                     replace=False)
 
-            rec_iters = [(edhrec_peers, 1, 'edh-peer'),
-                         (edhrec_non_peers, 0, 'edh-non_peer'),
-                         (non_edhrec_non_peers, 0, 'non_edh-non_peer')]
+            rec_iters = [(edhrec_peers, 0, 'edh-peer'),
+                         (edhrec_non_peers, 1, 'edh-non_peer'),
+                         (non_edhrec_non_peers, 1, 'non_edh-non_peer')]
 
             for name_b_rec_set, next_sentence_label, rec_set_type in rec_iters:
                 for name_b in name_b_rec_set:
