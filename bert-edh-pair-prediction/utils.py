@@ -22,7 +22,8 @@ def build_tokenizer_map_func(tokenizer, max_length=512):
         return tokenizer(rec['text_a'], rec['text_b'],
                          padding='max_length',
                          max_length=max_length,
-                         truncation=True, )
+                         truncation=True,
+                         return_special_tokens_mask=True)
     return tokenizer_map_func
 
 
