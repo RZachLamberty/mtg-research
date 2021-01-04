@@ -28,10 +28,6 @@ from datasets.utils.logging import set_verbosity_error
 set_verbosity_error()
 
 
-def add_labels(examples):
-    return {'labels': examples['input_ids']}
-
-
 def main(num_chunks, chunk, data_dir, num_max_pairs, out_dir, tokenizer_model_name, max_seq_length):
     tokenizer = BertTokenizerFast.from_pretrained(tokenizer_model_name)
     tokenizer_map_func = build_tokenizer_map_func(tokenizer, max_length=max_seq_length)
@@ -44,7 +40,6 @@ def main(num_chunks, chunk, data_dir, num_max_pairs, out_dir, tokenizer_model_na
                            num_chunks=num_chunks,
                            chunk=chunk)
      .map(tokenizer_map_func, batched=False)
-     .map(add_labels, batched=True)
      .save_to_disk(f"{out_dir}/{chunk:0>4}-{num_chunks:0>4}"))
 
 
