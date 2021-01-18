@@ -41,6 +41,7 @@ class EdhrecConfig(datasets.BuilderConfig):
     num_max_pairs: int = None
     num_chunks: int = None
     chunk: int = None
+    pair_type: str = 'rec-rec'
 
 
 class EdhrecDataset(datasets.GeneratorBasedBuilder):
@@ -66,17 +67,38 @@ class EdhrecDataset(datasets.GeneratorBasedBuilder):
             citation=_CITATION, )
 
     def _split_generators(self, dl_manager):
-        return [
-            datasets.SplitGenerator(name=datasets.Split.TRAIN, gen_kwargs={'split': 'train'}),
-            datasets.SplitGenerator(name=datasets.Split.TEST, gen_kwargs={'split': 'test'}),
-            datasets.SplitGenerator(name=datasets.Split.VALIDATION,
-                                    gen_kwargs={'split': 'validation'}),
-        ]
+        if self.config.pair_type == 'rec-rec':
+            return [
+                datasets.SplitGenerator(name=datasets.Split.TRAIN, gen_kwargs={'split': 'train'}),
+                datasets.SplitGenerator(name=datasets.Split.TEST, gen_kwargs={'split': 'test'}),
+                datasets.SplitGenerator(name=datasets.Split.VALIDATION,
+                                        gen_kwargs={'split': 'validation'}),
+            ]
+        elif self.config.pair_type == 'cmdr-rec':
+            return [
+                datasets.SplitGenerator(name=datasets.Split.TRAIN, gen_kwargs={'split': 'train'}),
+                datasets.SplitGenerator(name=datasets.splits.NamedSplit('test_cmdr'),
+                                        gen_kwargs={'split': 'test_cmdr'}),
+                datasets.SplitGenerator(name=datasets.splits.NamedSplit('test_set'),
+                                        gen_kwargs={'split': 'test_set'}),
+                datasets.SplitGenerator(name=datasets.Split.VALIDATION,
+                                        gen_kwargs={'split': 'validation'}),
+            ]
+        else:
+            raise ValueError(f"no such thing as config.pair_type = {self.config.pair_type}")
 
     def _generate_examples(self, split):
         """actually yield examples from split"""
-        #print(f"num_chunks = {self.config.num_chunks}")
-        #print(f"chunk = {self.config.chunk}")
+        if self.config.pair_type == 'rec-rec':
+            for ex in self._generate_examples_rec_rec(split):
+                yield ex
+        elif self.config.pair_type == 'cmdr-rec':
+            for ex in self._generate_examples_cmdr_rec(split):
+                yield ex
+        else:
+            raise ValueError(f"no such thing as config.pair_type = {self.config.pair_type}")
+
+    def _generate_examples_rec_rec(self, split):
         assert (self.config.num_chunks is None) == (
                     self.config.chunk is None), "provide both num_chunks and chunk or neither"
 
@@ -138,6 +160,71 @@ class EdhrecDataset(datasets.GeneratorBasedBuilder):
                     id_ = f'{sfid_a}_{sfid_b}'
                     yield (id_,
                            {'name_a': name_a,
+                            'text_a': text_a,
+                            'name_b': name_b,
+                            'text_b': text_b,
+                            'next_sentence_label': next_sentence_label,
+                            'rec_set_type': rec_set_type,
+                            'id': id_, })
+
+    def _generate_examples_cmdr_rec(self, split):
+        if self.config.num_chunks is not None:
+            raise ValueError('not handled yet')
+        assert (self.config.num_chunks is None) == (
+                    self.config.chunk is None), "provide both num_chunks and chunk or neither"
+
+        these_cards = pd.read_parquet(os.path.join(self.config.data_dir, f"cards.{split}.parquet"))
+        these_edhrec = pd.read_parquet(os.path.join(self.config.data_dir,
+                                                    f"edhrec.{split}.parquet"))
+        non_edhrec_card_names = (set(these_cards.index)
+                                 .difference(these_edhrec.name.unique())
+                                 .difference(these_edhrec.commander.unique()))
+
+        for (cmdr, cmdr_recs) in tqdm(these_edhrec.groupby('commander'),
+                                      total=these_edhrec.commander.nunique()):
+            try:
+                card_a = these_cards.loc[cmdr]
+            except KeyError:
+                continue
+
+            text_a = card_a.mytext
+            sfid_a = card_a.scryfallId
+
+            # cmdr_recs are the true labels. high value false labels are other
+            # cards which *are* recommended for *other* commander decks, but not this one
+            # low value false labels are cards never recommended on edhrec. relative to the number
+            # of true labels, generate 90% as many "high" false pairs, and 10% as many "low"
+            true_card_names = cmdr_recs.name.unique()
+            N = true_card_names.shape[0]
+            good_false_card_names = (these_edhrec
+                                     [~these_edhrec.name.isin(true_card_names)]
+                                     .name
+                                     .unique())
+            good_false_card_names = np.random.choice(
+                good_false_card_names,
+                size=min(good_false_card_names.shape[0], round(0.9 * N)))
+            bad_false_card_names = np.random.choice(
+                list(non_edhrec_card_names),
+                size=min(len(non_edhrec_card_names), round(0.1 * N)))
+
+            # generate every single true pairs. generate 90% as many "strong" false pairs, and
+            # 10% as many "weak" false pairs
+            rec_iters = [(true_card_names, 0, 'edh-true'),
+                         (good_false_card_names, 1, 'edh-false'),
+                         (bad_false_card_names, 1, 'non_edh-false')]
+
+            for name_b_rec_set, next_sentence_label, rec_set_type in rec_iters:
+                for name_b in name_b_rec_set:
+                    try:
+                        card_b = these_cards.loc[name_b]
+                        text_b = card_b.text
+                        sfid_b = card_b.scryfallId
+                    except KeyError:
+                        continue
+
+                    id_ = f'{sfid_a}_{sfid_b}'
+                    yield (id_,
+                           {'name_a': cmdr,
                             'text_a': text_a,
                             'name_b': name_b,
                             'text_b': text_b,
